@@ -26,7 +26,7 @@ impl Event {
 
 pub struct Hyprctl {
     socket: UnixStream,
-    callbacks: HashMap<Event, Vec<fn(&str)>>,
+    callbacks: HashMap<Event, Vec<Box<dyn Fn(&str) + Send + Sync>>>,
 }
 
 #[allow(dead_code)]
@@ -56,16 +56,14 @@ impl Hyprctl {
         }
     }
 
-    pub fn subscribe(&mut self, event: Event, callback: fn(&str)) {
-        if !self.callbacks.contains_key(&event) {
-            let mut new_vec: Vec<fn(&str)> = Vec::new();
-            new_vec.push(callback);
-            self.callbacks.insert(event, new_vec);
-        } else {
-            if let Some(callbacks) = self.callbacks.get_mut(&event) {
-                callbacks.push(callback);
-            }
-        }
+    pub fn subscribe<F>(&mut self, event: Event, callback: F)
+    where
+        F: Fn(&str) + 'static + Send + Sync,
+    {
+        self.callbacks
+            .entry(event)
+            .or_insert_with(Vec::new)
+            .push(Box::new(callback));
     }
 
     fn process_events(&self, event: &str) {

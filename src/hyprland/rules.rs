@@ -1,5 +1,52 @@
 use yaml_rust::Yaml;
 
+use super::Window;
+
+pub enum StaticRules {
+    Float,
+    Tile,
+    Fullscreen,
+    Maximize,
+    Move,
+    Size,
+    Center,
+    Workspace,
+    Pin,
+    None,
+}
+
+impl StaticRules {
+    fn from_str(name: &str) -> StaticRules {
+        match name {
+            "float" => StaticRules::Float,
+            "tile" => StaticRules::Tile,
+            "fullscreen" => StaticRules::Fullscreen,
+            "maximize" => StaticRules::Maximize,
+            "move" => StaticRules::Move,
+            "size" => StaticRules::Size,
+            "center" => StaticRules::Center,
+            "workspace" => StaticRules::Workspace,
+            "pin" => StaticRules::Pin,
+            _ => StaticRules::None,
+        }
+    }
+
+    fn command_from_str(name: &str) -> Option<String> {
+        let rule = StaticRules::from_str(&name);
+        match rule {
+            StaticRules::Pin | StaticRules::Fullscreen => Some(String::from(name)),
+            StaticRules::Maximize => Some(String::from("fullscreen 1")),
+            StaticRules::Float => Some(String::from("setfloating")),
+            StaticRules::Tile => Some(String::from("settiled")),
+            StaticRules::Center => Some(format!("{name}window")),
+            StaticRules::Workspace => Some(String::from("movetoworkspace")),
+            StaticRules::Move => Some(String::from("movewindowpixel exact")),
+            StaticRules::Size => Some(String::from("resizewindowpixel exact")),
+            StaticRules::None => None,
+        }
+    }
+}
+
 fn yaml_to_string(yaml: &Yaml) -> String {
     match yaml {
         Yaml::String(s) => s.to_string(),
@@ -16,75 +63,151 @@ fn yaml_to_string(yaml: &Yaml) -> String {
     }
 }
 
-fn process_match(match_rules: &Yaml) -> String {
-    let mut final_match: String = String::from("");
+fn process_match(match_rules: &Yaml) -> (String, Option<String>, Option<String>) {
+    let mut title: Option<String> = None;
+    let mut class: Option<String> = None;
 
-    let keys = match_rules.as_hash().unwrap().keys();
-    for field in keys {
-        let field = field.as_str().unwrap();
-        if !(field == "dynamic") {
-            let current_match = format!("{}:{},", field, yaml_to_string(&match_rules[field]));
-            final_match.push_str(&current_match);
-        }
-    }
-    // remove the trailing comma
-    final_match.remove(final_match.len() - 1);
-    final_match
-}
+    let final_match = match_rules
+        .as_hash()
+        .unwrap()
+        .keys()
+        .filter_map(|key| key.as_str())
+        .filter(|&f| f != "follow-title")
+        .map(|field| {
+            let value = yaml_to_string(&match_rules[field]);
 
-fn process_properties(properties: &Yaml) -> Vec<String> {
-    let mut final_properties: Vec<String> = Vec::new();
-    let keys = properties.as_hash().unwrap().keys();
-
-    for field in keys {
-        let field = field.as_str().unwrap();
-        match &properties[field] {
-            Yaml::String(s) => match field {
-                "plugin" => final_properties.push(format!("{}:{}", field, s)),
-                _ => final_properties.push(format!("{} {}", field, s)),
-            },
-            Yaml::Integer(i) => final_properties.push(format!("{} {}", field, i)),
-            Yaml::Boolean(b) => {
-                if *b {
-                    final_properties.push(format!("{}", field));
-                } else {
-                    match field {
-                        "allowsinput" => final_properties.push("allowsinput 0".to_string()),
-                        "dimaround" => final_properties.push("nodim".to_string()),
-                        _ => final_properties.push(format!("{} 0", field)),
-                    }
-                }
+            match field {
+                "class" => class = Some(value.clone()),
+                "title" => title = Some(value.clone()),
+                _ => (),
             }
-            _ => (),
-        }
-    }
 
-    final_properties
+            format!("{}:{}", field, value)
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    (final_match, title, class)
 }
 
-#[allow(dead_code)]
+fn process_properties(properties: &Yaml) -> (Vec<String>, Vec<String>) {
+    let (all_props, static_props) = properties.as_hash().unwrap().iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut all_props, mut static_props), (key, value)| {
+            let field = match key.as_str() {
+                Some(f) => f,
+                None => return (all_props, static_props),
+            };
+
+            all_props.push(match value {
+                Yaml::String(s) => handle_property_field(field, s),
+                Yaml::Integer(i) => format!("{} {}", field, i),
+                Yaml::Boolean(b) => handle_bool_property(field, *b),
+                _ => return (all_props, static_props),
+            });
+
+            if let Some(static_prop) = StaticRules::command_from_str(field) {
+                static_props.push(match StaticRules::from_str(field) {
+                    // StaticRules::Move | StaticRules::Workspace | StaticRules::Size => {
+                    //     if let Yaml::String(s) = value {
+                    //         format!("{static_prop} {s},")
+                    //     } else {
+                    //         return (all_props, static_props);
+                    //     }
+                    // }
+                    StaticRules::Move | StaticRules::Size | StaticRules::Workspace => match value {
+                        Yaml::String(s) => format!("{static_prop} {s},"),
+                        Yaml::Integer(i) => format!("{static_prop} {i},"),
+                        _ => return (all_props, static_props),
+                    },
+                    _ => format!("{static_prop} "),
+                });
+            }
+
+            (all_props, static_props)
+        },
+    );
+
+    (all_props, static_props)
+}
+
+fn handle_property_field(field: &str, param: &str) -> String {
+    match field {
+        "plugin" => format!("{}:{}", field, param),
+        _ => format!("{} {}", field, param),
+    }
+}
+
+fn handle_bool_property(field: &str, b: bool) -> String {
+    if b {
+        field.to_string()
+    } else {
+        match field {
+            "dimaround" => "nodim".into(),
+            _ => format!("{field} 0"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct StaticRule {
+    title: String,
+    class: String,
+    properties: Vec<String>,
+}
+
+impl StaticRule {
+    pub fn apply_properties(&self, ipc: &super::send::Hyprctl, window: &Window) {
+        if self.title == window.title && self.class == window.class {
+            self.properties.iter().for_each(|p| {
+                let compiled_property = format!("{p}address:0x{:x}", window.address);
+                ipc.dispatch(&compiled_property);
+            });
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Rule {
     match_rules: String,
     properties: Vec<String>,
-    follow_title: bool,
+    pub static_properties: Option<StaticRule>,
 }
 
 impl Rule {
     pub fn new(match_rules: &Yaml, properties: &Yaml) -> Self {
-        let follow_title = {
-            let follow = match_rules["follow-title"].as_bool();
-            if let None = follow {
-                false
+        let follow_title = match match_rules["follow-title"] {
+            Yaml::Boolean(b) => b,
+            _ => false,
+        };
+
+        let (match_rules, title, class) = process_match(&match_rules);
+        let (properties, static_props) = process_properties(&properties);
+
+        let static_properties: Option<StaticRule> = {
+            if follow_title {
+                let (title, class) = match (title, class) {
+                    (Some(t), Some(c)) => (t, c),
+                    _ => {
+                        eprintln!("Error: follow-title requires both title and class to be set.");
+                        std::process::exit(1);
+                    }
+                };
+
+                Some(StaticRule {
+                    title: title.to_string(),
+                    class: class.to_string(),
+                    properties: static_props,
+                })
             } else {
-                follow.unwrap()
+                None
             }
         };
-        let match_rules = process_match(&match_rules);
-        let properties = process_properties(&properties);
+
         Rule {
             match_rules,
             properties,
-            follow_title,
+            static_properties,
         }
     }
 

@@ -59,9 +59,17 @@ impl Hyprctl {
         self.send(&msg);
     }
 
+    pub fn dispatch(&self, msg: &str) {
+        self.send(&format!("dispatch {msg}"));
+    }
+
     pub fn get_active_window(&self) -> Option<Window> {
         match self.send("activewindow") {
             Some(window) => {
+                if window == "Invalid" {
+                    return None;
+                }
+
                 let cleand_up_response = window
                     .lines()
                     .skip(1)
@@ -74,13 +82,18 @@ impl Hyprctl {
                     let end_i = first_line.find(" ->").unwrap();
                     isize::from_str_radix(&first_line[start_i..end_i], 16).unwrap()
                 };
-                let window = YamlLoader::load_from_str(&cleand_up_response).unwrap();
-                let window = Window {
-                    address,
-                    title: String::from(window[0]["title"].as_str().unwrap()),
-                    class: String::from(window[0]["class"].as_str().unwrap()),
-                };
-                return Some(window);
+
+                match YamlLoader::load_from_str(&cleand_up_response) {
+                    Ok(window) => {
+                        let window = Window {
+                            address,
+                            title: String::from(window[0]["title"].as_str().unwrap()),
+                            class: String::from(window[0]["class"].as_str().unwrap()),
+                        };
+                        Some(window)
+                    }
+                    Err(_) => None,
+                }
             }
             None => None,
         }
