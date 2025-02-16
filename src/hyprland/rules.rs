@@ -102,6 +102,7 @@ fn process_properties(properties: &Yaml) -> (Vec<String>, Vec<String>) {
             all_props.push(match value {
                 Yaml::String(s) => handle_property_field(field, s),
                 Yaml::Integer(i) => format!("{} {}", field, i),
+                Yaml::Real(r) => format!("{} {}", field, r),
                 Yaml::Boolean(b) => handle_bool_property(field, *b),
                 _ => return (all_props, static_props),
             });
