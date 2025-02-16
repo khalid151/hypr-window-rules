@@ -1,0 +1,48 @@
+# Multiple properties per windowrulev2 match
+- match:
+    class: kitty
+  properties:
+    move: 100 100
+    animation: popin
+    opacity: 1.0 override 0.5 override 0.8 override
+    rounding: 10
+
+- match:
+    class: firefox
+  properties:
+    noblur: true
+
+- match:
+    fullscreen: true
+  properties:
+    bordercolor: rgb(FF0000)
+
+- match:
+    fullscreenstate: '* 1'
+  properties:
+    bordercolor: rgb(00FF00)
+
+- match:
+    title: .*Hyprland.*
+  properties:
+    bordercolor: rgb(FFFF00)
+
+# Multiple windowrulev2 matching that share the same properties
+- match:
+  - class: kitty
+    title: kitty
+  - class: Terminal
+    initialTitle: Alacritty
+  properties:
+    float: true
+
+# Applying some static rules on title change with follow-title set to true
+# Note that class and title must be set. No regex.
+- match:
+    class: Terminal
+    title: htop
+    follow-title: true
+  properties:
+    float: true
+    center: true
+    size: 30% 30%
