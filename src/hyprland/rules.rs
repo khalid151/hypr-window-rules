@@ -109,13 +109,6 @@ fn process_properties(properties: &Yaml) -> (Vec<String>, Vec<String>) {
 
             if let Some(static_prop) = StaticRules::command_from_str(field) {
                 static_props.push(match StaticRules::from_str(field) {
-                    // StaticRules::Move | StaticRules::Workspace | StaticRules::Size => {
-                    //     if let Yaml::String(s) = value {
-                    //         format!("{static_prop} {s},")
-                    //     } else {
-                    //         return (all_props, static_props);
-                    //     }
-                    // }
                     StaticRules::Move | StaticRules::Size | StaticRules::Workspace => match value {
                         Yaml::String(s) => format!("{static_prop} {s},"),
                         Yaml::Integer(i) => format!("{static_prop} {i},"),
