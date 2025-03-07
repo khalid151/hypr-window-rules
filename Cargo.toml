@@ -1,7 +1,17 @@
 [package]
-name = "hyprrules"
+name = "hypr-window-rules"
 version = "0.1.0"
+authors = ["Khalid Al-Ani <khalid.y96@outlook.com>"]
+readme = "README.md"
+homepage = "https://github.com/khalid151/hypr-window-rules"
+repository = "https://github.com/khalid151/hypr-window-rules"
+keywords = ["hyprland"]
+categories = ["command-line-utilities"]
 edition = "2021"
 
 [dependencies]
 yaml-rust = "0.4.5"
+
+[[bin]]
+name = "hyprwrules"
+path = "src/main.rs"
