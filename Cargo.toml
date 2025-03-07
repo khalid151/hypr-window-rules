@@ -2,6 +2,8 @@
 name = "hypr-window-rules"
 version = "0.1.0"
 authors = ["Khalid Al-Ani <khalid.y96@outlook.com>"]
+description = "A simple tool to generate windowrulev2 out of YAML file"
+license = "GPL-3.0-or-later"
 readme = "README.md"
 homepage = "https://github.com/khalid151/hypr-window-rules"
 repository = "https://github.com/khalid151/hypr-window-rules"
