@@ -2,20 +2,26 @@
 
 A simple tool to generate `windowrulev2` out of a YAML file, and have some properties apply on title change.
 
+## Installation
+```
+cargo install hypr-window-rules
+```
+
 ## Usage
 
 This tool simply prints the generated `windowrulev2` to stdout, so to have Hyprland make use of it, save the output to a file and source it.
 
 As for rules with `follow-title`, `hyprwrules` will keep running to apply the set properties.
 
+`hyprwrules` expects one argument which is the path to YAML file. If not supplied, it will look for it in `$HOME/.config/hypr/rules.yaml`.
+
+In Hyprland's config:
 ```
-$ hyprwrules example.yaml > ~/.config/hypr/rules.conf
+exec-once = hyprwrules ~/.config/hypr/rules.yaml > ~/.config/hypr/rules.conf
+source = ~/.config/hypr/rules.conf
 ```
 
-And in Hyprland's config
-```
-source=~/.config/hypr/rules.conf
-```
+[This example](https://github.com/khalid151/hypr-window-rules/blob/master/examples/example.yaml) translates most of the example rules in [hyprland's wiki](https://wiki.hyprland.org/Configuring/Window-Rules/#example-rules).
 
 ## Static properties
 
