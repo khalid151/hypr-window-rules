@@ -48,7 +48,7 @@ pub fn load_config(path: &str) -> Result<Vec<StaticRule>, LoadError> {
             rule_iter.filter_map(|mut rule| {
                 rule.compile()
                     .iter()
-                    .for_each(|l| println!("windowrulev2 = {l}"));
+                    .for_each(|l| println!("windowrule = {l}"));
                 rule.static_properties.take()
             })
         })
