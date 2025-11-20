@@ -34,21 +34,23 @@ pub fn load_config(path: &str) -> Result<Vec<StaticRule>, LoadError> {
         .flat_map(|rule_block| {
             let properties = &rule_block["properties"];
             let match_entry = &rule_block["match"];
+            let name = match &rule_block["name"] {
+                Yaml::String(s) => Some(s.to_string()),
+                _ => None,
+            };
 
             let rule_iter = match match_entry {
                 Yaml::Array(a) => a
                     .iter()
-                    .map(move |m| Rule::new(m, properties))
+                    .map(move |m| Rule::new(name.clone(), m, properties))
                     .collect::<Vec<_>>()
                     .into_iter(),
-                Yaml::Hash(_) => vec![Rule::new(match_entry, properties)].into_iter(),
+                Yaml::Hash(_) => vec![Rule::new(name, match_entry, properties)].into_iter(),
                 _ => vec![].into_iter(),
             };
 
             rule_iter.filter_map(|mut rule| {
-                rule.compile()
-                    .iter()
-                    .for_each(|l| println!("windowrule = {l}"));
+                println!("{}", rule.compile());
                 rule.static_properties.take()
             })
         })

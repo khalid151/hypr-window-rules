@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use yaml_rust::Yaml;
 
 use super::Window;
@@ -63,9 +65,12 @@ fn yaml_to_string(yaml: &Yaml) -> String {
     }
 }
 
-fn process_match(match_rules: &Yaml) -> (String, Option<String>, Option<String>) {
+fn process_match(match_rules: &Yaml, named: bool) -> (String, Option<String>, Option<String>) {
     let mut title: Option<String> = None;
     let mut class: Option<String> = None;
+
+    let format_match = if named { " = " } else { " " };
+    let joiner = if named { "\n" } else { ", " };
 
     let final_match = match_rules
         .as_hash()
@@ -82,10 +87,10 @@ fn process_match(match_rules: &Yaml) -> (String, Option<String>, Option<String>)
                 _ => (),
             }
 
-            format!("{}:{}", field, value)
+            format!("match:{}{}{}", field, format_match, value)
         })
         .collect::<Vec<_>>()
-        .join(",");
+        .join(joiner);
 
     (final_match, title, class)
 }
@@ -127,14 +132,14 @@ fn process_properties(properties: &Yaml) -> (Vec<String>, Vec<String>) {
 
 fn handle_property_field(field: &str, param: &str) -> String {
     match field {
-        "plugin" => format!("{}:{}", field, param),
+        "plugin" => format!("{}", param),
         _ => format!("{} {}", field, param),
     }
 }
 
 fn handle_bool_property(field: &str, b: bool) -> String {
     if b {
-        field.to_string()
+        format!("{field} 1")
     } else {
         match field {
             "dimaround" => "nodim".into(),
@@ -163,19 +168,25 @@ impl StaticRule {
 
 #[derive(Debug)]
 pub struct Rule {
+    name: Option<String>,
     match_rules: String,
     properties: Vec<String>,
     pub static_properties: Option<StaticRule>,
 }
 
 impl Rule {
-    pub fn new(match_rules: &Yaml, properties: &Yaml) -> Self {
+    pub fn new(name: Option<String>, match_rules: &Yaml, properties: &Yaml) -> Self {
         let follow_title = match match_rules["follow-title"] {
             Yaml::Boolean(b) => b,
             _ => false,
         };
 
-        let (match_rules, title, class) = process_match(&match_rules);
+        let is_named = match name {
+            Some(_) => true,
+            None => false,
+        };
+
+        let (match_rules, title, class) = process_match(&match_rules, is_named);
         let (properties, static_props) = process_properties(&properties);
 
         let static_properties: Option<StaticRule> = {
@@ -199,17 +210,34 @@ impl Rule {
         };
 
         Rule {
+            name,
             match_rules,
             properties,
             static_properties,
         }
     }
 
-    pub fn compile(&self) -> Vec<String> {
-        let mut rules: Vec<String> = Vec::new();
-        for property in &self.properties {
-            rules.push(format!("{},{}", property, self.match_rules));
+    pub fn compile(&self) -> String {
+        match &self.name {
+            Some(name) => {
+                let modified_matches = self.match_rules.replace("\n", "\n    ");
+                let modified_props = self
+                    .properties
+                    .iter()
+                    .map(|s| format!("    {}", s.replacen(" ", " = ", 1)))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                format!(
+                    "windowrule {{\n    name = {}\n    {}\n\n{}\n}}",
+                    name, modified_matches, modified_props
+                )
+            }
+            None => format!(
+                "windowrule = {}, {}",
+                self.properties.join(", "),
+                self.match_rules
+            ),
         }
-        rules
     }
 }
